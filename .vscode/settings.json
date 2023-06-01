@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "entropy.h": "c",
+        "err.h": "c"
+    }
+}
