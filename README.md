@@ -2,12 +2,31 @@
 
 [![PyPI version](https://badge.fury.io/py/randonautentropy.svg)](https://pypi.org/project/randonautentropy/) [![PyPI - License](https://img.shields.io/pypi/l/randonautentropy)](https://pypi.org/project/randonautentropy/)
 
-This project provides tools for interacting with the Randonautica Quantum and Temporal entropy generators. It provides a Python API, and a `rndo` command-line tool.
+This project provides tools for interacting with the Randonautica QRNG and [Temporal](https://github.com/TheRandonauts/temporal) entropy generators. It provides a Python API, and a `rndo` command-line tool.
+
+### Fair Use Policy
+
+Please request only the entropy amount you really need for your project. Please note that in case of overuse the API is subject to immediate modifications and amendments to free availability.
+
+Temporal on the other hand runs on your system and is always available.
 
 ## Installation
 
 ```
 $ pip install randonautentropy
+```
+
+### Installing Temporal
+
+The first time the `temporal.get` Python method or `rndo -t` command line option are called, a script attempts to automatically install the [TemporalLib](https://github.com/TheRandonauts/temporal) shell tool dependency in `/usr/local/bin`
+
+In case that fails you can install it yourself:
+
+```
+$ sudo apt install git build-essential
+$ git clone --depth 1 git@github.com:TheRandonauts/temporal.git
+$ cd temporal
+$ ./make.sh
 ```
 
 ---
