@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="randonautentropy",
-    version="0.0.2",
+    version="1.0.2",
     author="randogoth",
     author_email="randogoth@posteo.org",
     description="Python API for interacting with The Randonautica Quantum Random Number Generator",

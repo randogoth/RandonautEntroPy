@@ -1,4 +1,4 @@
-# randonautentropy
+# RandonautEntroPy
 
 [![PyPI version](https://badge.fury.io/py/randonautentropy.svg)](https://pypi.org/project/randonautentropy/) [![PyPI - License](https://img.shields.io/pypi/l/randonautentropy)](https://pypi.org/project/randonautentropy/)
 
@@ -9,6 +9,9 @@ This project provides tools for interacting with the Randonautica Quantum and Te
 ```
 $ pip install randonautentropy
 ```
+
+---
+
 ## Python API
 
 The randonautentropy Python module contains low-level `get` functions.
@@ -21,6 +24,15 @@ The randonautentropy Python module contains low-level `get` functions.
 
 e5b779d67eda68636cb9
 
+>>> temporal.get(length=10, channel=0)
+
+d0c7ca53cb57ede1be14
+```
+
+### Extended Functionality
+
+The `rndo.get` function can also retrieve a single 32bit random number in different formats:
+```Python
 >>> rndo.get(type='int32')
 
 -968449906
@@ -36,16 +48,17 @@ e5b779d67eda68636cb9
 >>> rndo.get(type='base64')
 
 JA==
+```
+The `temporal.get` method can switch from the default high quality entropy mode to a faster but slightly lower entropy mode by switching its `channel` to 1.
 
->>> temporal.get(length=10, channel=0)
-
-d0c7ca53cb57ede1be14
-
+```Python
 >>> temporal.get(channel=1)
 
 b83a7fd79bee5b3b1ad7
 
 ```
+
+---
 
 ## Command Line Interface
 
