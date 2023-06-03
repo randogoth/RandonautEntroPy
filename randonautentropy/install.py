@@ -2,6 +2,10 @@ import os
 import shutil
 
 def install():
+    """
+    Tries to fetch TemporalLib from GitHub and build it
+
+    """
     print("TemporalLib not found. Attempting to install it...")
     print("==================================================")
     module_path = os.path.abspath(os.path.dirname(__file__))

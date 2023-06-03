@@ -9,7 +9,6 @@ import json
 from urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
-VERSION = '1.0.0'
 URL = 'https://qrng.randonautica.com/api/json/'
 typeS = {
     'int32' : 'randint32', 
@@ -22,7 +21,14 @@ typeS = {
 DEVICE_ID = 'QWR70154'
 
 def get(length=10, type='hex16'):
-    """Fetch data from the Randonautica Quantum Random Numbers JSON API"""
+    """
+    Fetch data from the Randonautica Quantum Random Numbers JSON API
+    
+    length (int):  length of bytes to get from the QRNG when `type=hex16`
+    type (string): type of random number data to fetch. 
+                   Valid choices are `hex16`, `int32`, `uniform`, `normal`, `base64`
+
+    """
     if type not in typeS.keys():
         raise Exception("type must be one of %s" % typeS.keys())
     url = URL + typeS[type] + '?' + urlencode({
