@@ -27,89 +27,117 @@ DEVICE_ID = 'QWR70154'
 def get(length=10, type='hex16', timeout=1.5):
     """
     Fetch data from the Randonautica Quantum Random Numbers JSON API.
-    Falls back to local randomness if the API is unavailable.
 
-    length (int): number of values/bytes to get
-    type (str): one of {'hex16','int32','uniform','normal','base64'}
-    timeout (float): HTTP timeout in seconds
+    Non-breaking behavior:
+      - length is ONLY used for type='hex16' (number of hex BYTES).
+      - All other types return exactly ONE value.
+
+    Returns by type:
+      - 'uniform' -> float in [0,1)
+      - 'normal'  -> float (Gaussian)
+      - 'int32'   -> signed 32-bit int
+      - 'base64'  -> str (single base64 blob)
+      - 'hex16'   -> str of length 2*length (hex chars)
+
+    Falls back to local randomness if the API is unavailable or returns
+    an unexpected shape.
     """
     if type not in typeS:
         raise Exception("type must be one of %s" % list(typeS.keys()))
 
-    # Try QRNG first
-    url = URL + typeS[type] + '?' + urlencode({
-        'device_id': DEVICE_ID,
-        'length': length,
-    })
+    # Build URL. `length` only meaningful for hex16; QRNG ignores it for others.
+    params = {'device_id': DEVICE_ID}
+    if type == 'hex16':
+        params['length'] = int(length)
+
+    url = URL + typeS[type] + '?' + urlencode(params)
+
+    # Try API first
     try:
         data = __get_json(url, timeout=timeout)
-        # Validate expected shape minimally
-        if isinstance(data, dict) and "data" in data and isinstance(data["data"], list):
-            return data
-        # If shape unexpected, fall back
+        return _parse_api_value(type, data, length)
     except Exception:
-        pass
-
-    # Fallback path: generate locally with best available primitives
-    return _fallback_response(type=type, length=length)
+        # Network/parse/shape error -> fallback
+        return _fallback_value(type, length)
 
 def __get_json(url, timeout=1.5):
     resp = requests.get(url, verify=False, timeout=timeout)
     resp.raise_for_status()
     return resp.json()
 
-def _fallback_response(type: str, length: int):
+# ----- Helpers -----
+
+def _parse_api_value(t, payload, length):
     """
-    Produce a response object that mirrors the QRNG API:
-    {
-      "type": <type>,
-      "length": <length>,
-      "data": [...],
-      "success": true,
-      "source": "fallback"
-    }
+    Accept common shapes:
+      - {"data":[...]}  (usual)
+      - bare number/string
+      - single-item list
+    Enforce return types listed in get() docstring.
     """
-    if type == 'uniform':
-        # Uniform floats in [0.0, 1.0)
-        data = [random.random() for _ in range(length)]
+    # Helper to pull first item from possible shapes
+    def first_item(x):
+        if isinstance(x, dict) and "data" in x and x["data"]:
+            return x["data"][0] if isinstance(x["data"], list) else x["data"]
+        if isinstance(x, list) and x:
+            return x[0]
+        return x
 
-    elif type == 'normal':
-        # Standard normal N(0,1)
-        data = [random.gauss(0.0, 1.0) for _ in range(length)]
+    if t == 'uniform':
+        v = float(first_item(payload))
+        if not (0.0 <= v < 1.0):
+            raise ValueError("uniform out of range")
+        return v
 
-    elif type == 'int32':
-        # 32-bit signed ints (match typical randint32 range: [-2^31, 2^31-1])
-        # secrets is preferable to random for stronger entropy.
-        data = []
-        for _ in range(length):
-            u = secrets.randbits(32)
-            # Convert to signed 32-bit
-            if u & (1 << 31):
-                u = u - (1 << 32)
-            data.append(u)
+    if t == 'normal':
+        return float(first_item(payload))
 
-    elif type == 'hex16':
-        # Hex string of length*2 bytes? The API name suggests 16-bit hex bytes.
-        # Historically this endpoint returns hex bytes; emulate by returning a single hex string
-        # of 2*length characters (each byte -> 2 hex chars). If API returns list, adapt as needed.
-        # Here we return a list of hex byte strings to match "data": [...]
-        data = [secrets.token_hex(1) for _ in range(length)]
+    if t == 'int32':
+        v = int(first_item(payload))
+        # normalize to signed 32-bit just in case
+        v = ((v + 2**31) % 2**32) - 2**31
+        return v
 
-    elif type == 'base64':
-        # Return base64-encoded random bytes; match as a list of base64 strings
-        data = []
-        for _ in range(length):
-            b = os.urandom(16)  # 16 bytes per element; adjust if your API uses a different size
-            data.append(base64.b64encode(b).decode('ascii'))
+    if t == 'base64':
+        v = first_item(payload)
+        if not isinstance(v, str):
+            # Sometimes APIs deliver bytes; normalize to str
+            v = str(v)
+        return v
 
-    else:
-        # Should never hit due to earlier check
-        data = []
+    if t == 'hex16':
+        # Expect list of hex bytes or a single hex string; normalize to one string of 2*length chars
+        d = payload.get("data", payload) if isinstance(payload, dict) else payload
+        if isinstance(d, list):
+            s = ''.join(str(b) for b in d)
+        else:
+            s = str(d)
+        # If API returned more/less, trim/pad to exact 2*length for strict non-breaking behavior
+        want = max(0, int(length)) * 2
+        if len(s) < want:
+            # pad with extra local entropy to reach length
+            s += secrets.token_hex((want - len(s) + 1) // 2)[:(want - len(s))]
+        elif len(s) > want and want > 0:
+            s = s[:want]
+        return s
 
-    return {
-        "type": type,
-        "length": length,
-        "data": data,
-        "success": True,
-        "source": "pseudo"
-    }
+    # Shouldn't reach here
+    raise ValueError("Unknown type")
+
+def _fallback_value(t, length):
+    if t == 'uniform':
+        return random.random()
+    if t == 'normal':
+        return random.gauss(0.0, 1.0)
+    if t == 'int32':
+        u = secrets.randbits(32)
+        # signed 32-bit
+        return u - (1 << 32) if (u & (1 << 31)) else u
+    if t == 'base64':
+        # 16 random bytes
+        return base64.b64encode(os.urandom(16)).decode('ascii')
+    if t == 'hex16':
+        # exactly `length` bytes -> 2*length hex chars
+        return secrets.token_hex(int(length))
+    # Shouldn't reach here
+    raise ValueError("Unknown type")
